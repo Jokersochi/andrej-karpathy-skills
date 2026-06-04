@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>RealtyAI Mobile</title>
+    <script src="https://cdn.tailwindcss.com/3.4.0"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.15/index.min.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        :root {
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
+            --nav-height: 64px;
+        }
+
+        * { font-family: 'Inter', sans-serif; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: #09090b;
+            color: #e4e4e7;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent body scroll, handle inside main */
+            height: 100dvh; /* Dynamic viewport height for mobile browsers */
+            width: 100vw;
+        }
+
+        /* Scrollbar hiding for cleaner mobile look */
+        ::-webkit-scrollbar { display: none; }
+        * { scrollbar-width: none; }
+
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: rgba(39, 39, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        .main-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 20px);
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            height: calc(var(--nav-height) + var(--safe-bottom));
+            padding-bottom: var(--safe-bottom);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: #71717a;
+            transition: color 0.2s;
+            width: 20%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .nav-item.active { color: #818cf8; }
+        .nav-item.active svg { stroke-width: 2.5px; transform: scale(1.1); }
+        .nav-item span { font-size: 10px; font-weight: 500; }
+
+        /* Animations */
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
+
+        /* Utilities */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-active { background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+        .status-busy { background: #f59e0b; animation: pulse 1.5s infinite; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        }
+        .btn-primary:active { transform: scale(0.98); }
+
+        /* Log Console specific */
+        .log-entry { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 11px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+
+        <!-- Mobile Header -->
+        <header class="shrink-0 px-5 pt-[max(env(safe-area-inset-top),16px)] pb-3 flex items-center justify-between bg-[#09090b]/80 backdrop-blur-md sticky top-0 z-40 border-b border-white/5">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i data-lucide="brain-circuit" class="w-4 h-4 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-white text-sm leading-none">RealtyAI</h1>
+                    <div class="flex items-center gap-1 mt-1">
+                        <span class="w-1.5 h-1.5 rounded-full status-active"></span>
+                        <span class="text-[10px] text-zinc-400 font-medium">Online</span>
+                    </div>
+                </div>
+            </div>
+            <button onclick="app.agents.toggleSimulation()" id="sim-btn" class="p-2 rounded-full bg-white/5 active:bg-white/10 transition">
+                <i data-lucide="play" class="w-5 h-5 text-indigo-400" id="sim-icon"></i>
+            </button>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-scroll-area p-4 space-y-6" id="main-content">
+
+            <!-- VIEW: DASHBOARD (Default) -->
+            <div id="view-dashboard" class="view-section animate-slide-up">
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <div class="glass-card rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="p-1.5 bg-indigo-500/10 rounded"><i data-lucide="building-2" class="w-4 h-4 text-indigo-400"></i></div>
+                            <span class="text-xs text-zinc-500">Объекты</span>
+                        </div>
+                        <div class="text-2xl font-bold text-white">24</div>
+                    </div>
+                    <div class="glass-card rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="p-1.5 bg-emerald-500/10 rounded"><i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i></div>
+                            <span class="text-xs text-zinc-500">Просмотры</span>
+                        </div>
+                        <div class="text-2xl font-bold text-white">8.5K</div>
+                    </div>
+                </div>
+
+                <!-- Live Activity Feed -->
+                <div class="glass-card rounded-xl overflow-hidden flex flex-col h-[400px]">
+                    <div class="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                        <h3 class="font-semibold text-white text-sm">Журнал агентов</h3>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span class="text-[10px] text-emerald-400 font-mono">LIVE</span>
+                        </div>
+                    </div>
+                    <div id="mobile-log" class="flex-1 overflow-y-auto p-3 space-y-2 bg-black/20">
+                        <div class="text-center text-zinc-600 text-xs py-10 italic">Нажмите ▶ вверху для запуска...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: PROPERTIES -->
+            <div id="view-properties" class="view-section hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-white">Мои объекты</h2>
+                    <button onclick="app.properties.openModal()" class="text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1.5 rounded-full font-medium">+ Добавить</button>
+                </div>
+                <div id="properties-list" class="space-y-3">
+                    <!-- JS Rendered -->
+                </div>
+            </div>
+
+            <!-- VIEW: AGENTS -->
+            <div id="view-agents" class="view-section hidden">
+                <h2 class="text-lg font-bold text-white mb-4">Статус агентов</h2>
+                <div class="space-y-3">
+                    <div class="glass-card p-4 rounded-xl border-l-4 border-indigo-500">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-white text-sm">Market Analyst</span>
+                            <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Active</span>
+                        </div>
+                        <p class="text-xs text-zinc-400">Анализ цен и конкурентов в реальном времени.</p>
+                    </div>
+                    <div class="glass-card p-4 rounded-xl border-l-4 border-purple-500">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-white text-sm">Content Generator</span>
+                            <span class="text-[10px] text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">Idle</span>
+                        </div>
+                        <p class="text-xs text-zinc-400">Генерация описаний для Avito/Cian.</p>
+                    </div>
+                    <div class="glass-card p-4 rounded-xl border-l-4 border-amber-500">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-white text-sm">Distribution Node</span>
+                            <span class="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">Queue: 12</span>
+                        </div>
+                        <p class="text-xs text-zinc-400">Отправка через API с учетом лимитов.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-settings" class="view-section hidden">
+                <h2 class="text-lg font-bold text-white mb-4">Настройки</h2>
+                <div class="space-y-4">
+                    <div class="glass-card p-4 rounded-xl">
+                        <label class="block text-xs text-zinc-500 mb-2">Avito API Key</label>
+                        <div class="flex gap-2">
+                            <input type="password" value="av_key_xxxx" class="flex-1 bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-white font-mono outline-none focus:border-indigo-500">
+                            <button class="px-3 py-2 bg-white/5 rounded text-xs text-white">Test</button>
+                        </div>
+                    </div>
+                    <div class="glass-card p-4 rounded-xl">
+                        <label class="block text-xs text-zinc-500 mb-2">Telegram Bot Token</label>
+                        <div class="flex gap-2">
+                            <input type="password" value="123:ABC..." class="flex-1 bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-white font-mono outline-none focus:border-indigo-500">
+                            <button class="px-3 py-2 bg-white/5 rounded text-xs text-white">Test</button>
+                        </div>
+                    </div>
+                    <button class="w-full py-3 rounded-xl bg-red-500/10 text-red-400 text-sm font-medium mt-4">Выйти из аккаунта</button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Bottom Navigation Bar -->
+        <nav class="bottom-nav glass-panel">
+            <div class="nav-item active" onclick="app.nav('dashboard')" data-target="dashboard">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span>Главная</span>
+            </div>
+            <div class="nav-item" onclick="app.nav('properties')" data-target="properties">
+                <i data-lucide="building-2" class="w-5 h-5"></i>
+                <span>Объекты</span>
+            </div>
+            <div class="nav-item" onclick="app.nav('agents')" data-target="agents">
+                <i data-lucide="bot" class="w-5 h-5"></i>
+                <span>Агенты</span>
+            </div>
+            <div class="nav-item" onclick="app.nav('settings')" data-target="settings">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span>Настройки</span>
+            </div>
+        </nav>
+
+    </div>
+
+    <!-- Add Property Modal (Bottom Sheet Style) -->
+    <div id="modal-add" class="fixed inset-0 z-[100] hidden">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="app.properties.closeModal()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-[#18181b] rounded-t-2xl p-6 border-t border-white/10 transform transition-transform duration-300 translate-y-full" id="modal-sheet">
+            <div class="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6"></div>
+            <h3 class="text-lg font-bold text-white mb-4">Новый объект</h3>
+            <div class="space-y-3">
+                <input id="inp-title" type="text" placeholder="Название (3-к квартира...)" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white text-sm focus:border-indigo-500 outline-none">
+                <input id="inp-price" type="text" placeholder="Цена (₽)" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white text-sm focus:border-indigo-500 outline-none">
+                <button onclick="app.properties.add()" class="w-full btn-primary py-3.5 rounded-lg text-white font-bold text-sm mt-2">Сохранить объект</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const app = {
+            state: {
+                currentView: 'dashboard',
+                isSimulating: false,
+                timer: null,
+                properties: [
+                    { id: 1, title: '3-к квартира, Тверская 12', price: '18.5 млн ₽', status: 'active' },
+                    { id: 2, title: 'Студия, Пресня', price: '9.2 млн ₽', status: 'active' },
+                    { id: 3, title: 'Лофт, Сити', price: '32 млн ₽', status: 'draft' }
+                ]
+            },
+
+            init() {
+                this.renderProperties();
+                lucide.createIcons();
+
+                // Handle safe areas on iOS
+                document.documentElement.style.setProperty('--safe-top', `${window.env?.safeAreaInsets?.top || 0}px`);
+            },
+
+            nav(viewId) {
+                this.state.currentView = viewId;
+
+                // Update Nav UI
+                document.querySelectorAll('.nav-item').forEach(el => {
+                    el.classList.toggle('active', el.dataset.target === viewId);
+                });
+
+                // Switch Content
+                document.querySelectorAll('.view-section').forEach(el => {
+                    if (el.id === `view-${viewId}`) {
+                        el.classList.remove('hidden');
+                        // Reset animation
+                        el.classList.remove('animate-slide-up');
+                        void el.offsetWidth;
+                        el.classList.add('animate-slide-up');
+                    } else {
+                        el.classList.add('hidden');
+                    }
+                });
+
+                // Scroll to top
+                document.querySelector('.main-scroll-area').scrollTop = 0;
+            },
+
+            properties: {
+                render() {
+                    const list = document.getElementById('properties-list');
+                    list.innerHTML = app.state.properties.map(p => `
+                        <div class="glass-card p-4 rounded-xl flex justify-between items-center">
+                            <div>
+                                <div class="font-bold text-white text-sm">${p.title}</div>
+                                <div class="text-xs text-zinc-400 mt-1">${p.price}</div>
+                            </div>
+                            <div class="w-2 h-2 rounded-full ${p.status === 'active' ? 'bg-emerald-500' : 'bg-zinc-600'}"></div>
+                        </div>
+                    `).join('');
+                },
+                openModal() {
+                    const modal = document.getElementById('modal-add');
+                    const sheet = document.getElementById('modal-sheet');
+                    modal.classList.remove('hidden');
+                    setTimeout(() => sheet.style.transform = 'translateY(0)', 10);
+                },
+                closeModal() {
+                    const sheet = document.getElementById('modal-sheet');
+                    sheet.style.transform = 'translateY(100%)';
+                    setTimeout(() => document.getElementById('modal-add').classList.add('hidden'), 300);
+                },
+                add() {
+                    const t = document.getElementById('inp-title').value;
+                    const p = document.getElementById('inp-price').value;
+                    if(!t) return;
+                    app.state.properties.unshift({ id: Date.now(), title: t, price: p || 'TBD', status: 'draft' });
+                    this.render();
+                    this.closeModal();
+                    document.getElementById('inp-title').value = '';
+                    document.getElementById('inp-price').value = '';
+                }
+            },
+
+            agents: {
+                tasks: [
+                    { a: 'ANALYST', m: 'Scanning market data...', c: 'text-blue-400' },
+                    { a: 'COPY', m: 'Generating description...', c: 'text-purple-400' },
+                    { a: 'CHECK', m: 'Compliance OK (152-FZ)', c: 'text-emerald-400' },
+                    { a: 'POST', m: 'Publishing to Avito...', c: 'text-amber-400' }
+                ],
+                toggleSimulation() {
+                    const icon = document.getElementById('sim-icon');
+                    const log = document.getElementById('mobile-log');
+
+                    if (app.state.isSimulating) {
+                        clearInterval(app.state.timer);
+                        app.state.isSimulating = false;
+                        icon.setAttribute('data-lucide', 'play');
+                        icon.classList.replace('text-zinc-900', 'text-indigo-400');
+                        icon.parentElement.classList.replace('bg-indigo-400', 'bg-white/5');
+                    } else {
+                        app.state.isSimulating = true;
+                        icon.setAttribute('data-lucide', 'square');
+                        icon.classList.replace('text-indigo-400', 'text-zinc-900');
+                        icon.parentElement.classList.replace('bg-white/5', 'bg-indigo-400');
+
+                        log.innerHTML = ''; // Clear placeholder
+                        let i = 0;
+                        app.state.timer = setInterval(() => {
+                            const task = this.tasks[i % this.tasks.length];
+                            const time = new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+                            const entry = document.createElement('div');
+                            entry.className = 'log-entry animate-slide-up';
+                            entry.innerHTML = `<span class="text-zinc-600">[${time}]</span> <span class="${task.c} font-bold">[${task.a}]</span> <span class="text-zinc-300">${task.m}</span>`;
+
+                            log.appendChild(entry);
+                            log.scrollTop = log.scrollHeight;
+                            i++;
+                        }, 1200);
+                    }
+                    lucide.createIcons();
+                }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
